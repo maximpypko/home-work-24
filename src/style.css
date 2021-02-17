@@ -1,0 +1,14 @@
+body ul {
+    list-style: none;
+    font-size: 20px;
+    font-weight: bold;
+}
+
+li {
+    cursor: pointer;
+}
+
+.starships {
+    font-size: 15px;
+    font-weight: 500;
+}
