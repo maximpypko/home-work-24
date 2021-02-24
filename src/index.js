@@ -1,116 +1,120 @@
-const num = 0;
-const num1 = 1;
+class StarWars {
+    static STARSHIPS_URL = 'https://swapi.dev/api/starships';
 
-const getShips = async function (email, acc = []) {
-    await fetch(email)
-        .then(response => {
-            const successfulRequestNumber = 200;
-            if (response.status !== successfulRequestNumber) {
-                return Promise.reject(new Error(response.status));
+    state = {
+        starships: [],
+        next: StarWars.STARSHIPS_URL,
+        films: new Map(),
+    }
+
+    constructor(loadButton, listParent) {
+        this.loadButton = loadButton;
+        this.listParent = listParent;
+        this.initLoadEvent();
+        this.initItemEvent();
+    }
+
+    getData = async function(url){
+        const response = await fetch(url);
+        const data = await response.json();
+
+        return data;
+    }
+
+    initLoadEvent() {
+        this.loadButton.addEventListener('click', async () => {
+            const data = await this.getData(this.state.next);
+
+            const { results: newStarships, next } = data;
+            this.state.starships = [...this.state.starships, ...newStarships];
+            this.state.next = next;
+
+            if (!next) {
+                this.loadButton.setAttribute('disabled', 'disabled');
             }
-            return Promise.resolve(response);
-        })
-        .then(response => response.json())
-        .then(data => {
-            for (const iterator of data.results) {
-                acc.push(iterator);
-            }
-            return data;
-        })
-        .then(data => {
-            if (data.next) {
-                return getShips(data.next, acc);
+            this.renderListItems();
+        });
+    }
+
+    initItemEvent() {
+        this.listParent.addEventListener('click', async ({ target }) => {
+            if (target.hasAttribute('data') && !target.children.length) {
+                const shipName = target.innerText;
+                const { films: filmLinks } = this.state.starships.find(x => x.name === shipName);
+                const films = await this.getFilms(filmLinks);
+                this.renderFilms(films, target);
+            } else {
+                this.deleteData(target);
             }
         });
-    return acc;
-};
-
-const getFilms = async function (elem) {
-    const res = [];
-    elem.map((el) => {
-        res.push([el.title, el.starships]);
-    });
-    return await res;
-};
-
-const getArrUrl = async function (target, arrFilms) {
-    const res = [];
-    arrFilms.map((el) => {
-        if (el[num] === target.innerText) {
-            res.push(el[num1]);
-        }
-    });
-    return await res;
-};
-
-const matching = async function (arrShips, arrUrl) {
-    let res = [];
-    arrUrl.reduce((acc, el) => {
-        for (const iterator of el) {
-            for (const iterator2 of arrShips) {
-                if (iterator2.url === iterator) {
-                    acc.push(iterator2.name);
-                }
-            }
-        }
-        res = acc;
-    }, []);
-    return await res;
-};
-
-const result = async function (arrShips, arrFilms) {
-    const $Ul = document.createElement('UL');
-
-    for (const iterator of arrFilms) {
-        const $Li = document.createElement('LI');
-        $Li.append(iterator[num]);
-        $Ul.append($Li);
     }
-    document.body.appendChild($Ul);
 
-    await $Ul.addEventListener('click', (e) => {
-        const arrUrl = getArrUrl(e.target, arrFilms);
-        arrUrl
-            .then(data => {
-                const resultMatching = matching(arrShips, data);
-                resultMatching
-                    .then(data2 => {
-                        const $starshipContainer = document.createElement('UL');
-                        $starshipContainer.className = 'starships';
-                        data2.forEach(el => {
-                            const $starship = document.createElement('LI');
-                            $starship.append(el);
-                            $starshipContainer.appendChild($starship);
-                        });
-                        if (e.target.children.length === num) {
-                            e.target.appendChild($starshipContainer);
-                        } else {
-                            e.target.children[num].remove();
-                        }
-                    });
+    deleteData = target => {
+        if (target.closest('.films__item')) {
+            target.parentNode.remove();
+        } else if (target.closest('.films-list')) {
+            target.remove();
+        } else if (target.hasAttribute('data') && target.children.length) {
+            target.firstElementChild.remove();
+        }
+    }
+
+    async getFilms(links) {
+
+        const diff = [...new Set(links.filter(link => !this.state.films.has(link)))];
+        const films = await Promise.all(diff.map(this.getData));
+        this.setFilmsCache(links, films);
+
+        const cachedFilmsLinks = links.filter(x => !diff.includes(x));
+        const cachedFilms = cachedFilmsLinks.map(link => this.state.films.get(link));
+
+        return [...films, ...cachedFilms];
+    }
+
+    setFilmsCache(links, filmsData) {
+
+        links.forEach(link => {
+            if (!this.state.films.has(link)) {
+                this.state.films.set(link, filmsData.find(x => x.url === link));
+            }
+        });
+    }
+
+    renderFilms = (films, target) => {
+        if (!target.children.length) {
+            const titleFilms = films.map(filmsItem => filmsItem.title);
+            const ul = document.createElement('ul');
+            ul.classList.add('films-list');
+
+            titleFilms.forEach(title => {
+                const li = document.createElement('li');
+                li.classList.add('films__item');
+                li.textContent = title;
+                ul.appendChild(li);
             });
-    });
-};
+            target.appendChild(ul);
+        }
+    }
 
-fetch('https://swapi.dev/api/films/')
-    .then(data => data.json())
-    .then(data => {
-        const arrShips = [];
-        let arrFilms = [];
-        const ships = getShips('https://swapi.dev/api/starships/');
-        const films = getFilms(data.results);
-        films
-            .then(data2 => arrFilms = data2)
-            .catch(error => document.body.append(`Ooops... ошибка ${error.message}`));
-        ships
-            .then(nameShips => {
-                for (const iterator of nameShips) {
-                    arrShips.push({
-                        name: iterator.name,
-                        url: iterator.url,
-                    });
-                }
-                result(arrShips, arrFilms);
-            })
-            .catch(error => document.body.append(`Ooops... ошибка ${error.message}`));
-    });
+    renderListItems() {
+        const fragment = document.createDocumentFragment();
+
+        this.state.starships.forEach(ship => {
+            const li = document.createElement('li');
+            li.setAttribute('data', 'list__item');
+            li.classList.add('list__item');
+            li.textContent = ship.name;
+            fragment.appendChild(li);
+        });
+
+        this.listParent.innerHTML = '';
+        this.listParent.prepend(fragment);
+    }
+}
+
+
+// eslint-disable-next-line no-unused-vars
+const starWars = new StarWars(
+    document.querySelector('.load-ships'),
+    document.querySelector('.starships-list')
+);
