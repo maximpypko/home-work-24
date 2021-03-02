@@ -3,7 +3,9 @@
   "version": "0.0.1",
   "description": "Make your code great again",
   "scripts": {
-    "lint": "eslint ./"
+    "lint": "eslint ./",
+    "predeploy": "yarn build",
+    "deploy": "gh-pages -d build"
   },
   "author": "Koterniak Serhii",
   "license": "MIT",
